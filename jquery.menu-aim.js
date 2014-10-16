@@ -90,6 +90,7 @@
                 rowSelector: "> li",
                 submenuSelector: "*",
                 submenuDirection: "right",
+                submenuActiveSelector: null,
                 tolerance: 75,  // bigger = more forgivey when entering submenu
                 enter: $.noop,
                 exit: $.noop,
@@ -154,6 +155,21 @@
                 activate(this);
             };
 
+        var isInSubmenu = function() {
+            var submenu = $(options.submenuSelector + options.submenuActiveSelector),
+                loc = mouseLocs[mouseLocs.length - 1];
+
+            if (options.submenuActiveSelector && submenu.length) {
+                if (!(loc.x < submenu[0].offsetLeft || loc.x > (submenu[0].offsetLeft + submenu[0].offsetWidth)
+                    || loc.y < submenu[0].offsetTop || loc.x > (submenu[0].offsetTop + submenu[0].offsetHeight))) {
+
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         /**
          * Activate a menu row.
          */
@@ -174,6 +190,10 @@
          * Possibly activate a menu row. If mouse movement indicates that we
          * shouldn't activate yet because user may be trying to enter
          * a submenu's content, then delay and check again later.
+         *
+         * If submenuSelector is passed as an option, check if mouse is inside
+         * submenu. This is useful if submenu is not a child element of the
+         * primary menu element.
          */
         var possiblyActivate = function(row) {
                 var delay = activationDelay();
@@ -182,7 +202,7 @@
                     timeoutId = setTimeout(function() {
                         possiblyActivate(row);
                     }, delay);
-                } else {
+                } else if (!(options.submenuSelector !== '*' && isInSubmenu())){
                     activate(row);
                 }
             };
@@ -196,7 +216,8 @@
          * checking again to see if the row should be activated.
          */
         var activationDelay = function() {
-                if (!activeRow || !$(activeRow).is(options.submenuSelector)) {
+                if (!activeRow || !$(activeRow).is(options.submenuSelector) &&
+                    !(options.submenuActiveSelector && $(options.submenuSelector + options.submenuActiveSelector).length)) {
                     // If there is no other submenu row already active, then
                     // go ahead and activate immediately.
                     return 0;
@@ -204,19 +225,19 @@
 
                 var offset = $menu.offset(),
                     upperLeft = {
-                        x: offset.left,
+                        x: offset.left - options.tolerance,
                         y: offset.top - options.tolerance
                     },
                     upperRight = {
-                        x: offset.left + $menu.outerWidth(),
+                        x: offset.left + $menu.outerWidth() + options.tolerance,
                         y: upperLeft.y
                     },
                     lowerLeft = {
-                        x: offset.left,
+                        x: upperLeft.x,
                         y: offset.top + $menu.outerHeight() + options.tolerance
                     },
                     lowerRight = {
-                        x: offset.left + $menu.outerWidth(),
+                        x: upperRight.x,
                         y: lowerLeft.y
                     },
                     loc = mouseLocs[mouseLocs.length - 1],
@@ -294,7 +315,8 @@
                     prevIncreasingSlope = slope(prevLoc, increasingCorner);
 
                 if (decreasingSlope < prevDecreasingSlope &&
-                        increasingSlope > prevIncreasingSlope) {
+                        increasingSlope > prevIncreasingSlope ||
+                        isInSubmenu()) {
                     // Mouse is moving from previous location towards the
                     // currently activated submenu. Delay before activating a
                     // new menu row, because user may be moving into submenu.
